@@ -2,6 +2,8 @@
 import asyncio
 from asyncio import Queue
 
+POISON_PILL = 'POISON_PILL'
+
 
 class PrintManager(object):
     """Fetches data, assigns to printer and does some operations."""
@@ -27,11 +29,11 @@ class PrintManager(object):
         """
         while not queue_for_printer.empty():
             print_item = yield from queue_for_printer.get()
-            if print_item.type is POISON_PILL:
+            if hasattr(print_item, "type") and print_item.type is POISON_PILL:
                 break
-            yield from send_to_printer(print_item)
+            yield from self.send_to_printer(print_item)
             # TODO: Check status and handle printer error
-            yield from update_operations_backend(print_item)
+            yield from self.update_print_completion(print_item)
 
     def get_print_items(self):
         """Dummyd data with printer_id."""
@@ -77,8 +79,10 @@ class PrintManager(object):
         i = 0
         for printer_id, print_item_list in grouped_print_items.items():
             [queues[i].put_nowait(item) for item in print_item_list]
+            queue_printer_tuples.append((queues[i], printer_id))
             i += 1
-        print("populate_queues :{}".format(queues))
+        print("populate_queues :{}".format(queue_printer_tuples))
+        return queue_printer_tuples
 
     def start(self):
         """Base algorithm for execution."""
