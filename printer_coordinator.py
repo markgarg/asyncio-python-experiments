@@ -58,6 +58,7 @@ class PrintManager(object):
     def __init__(self):
         self.printer_queue_mapping = {}
 
+    @asyncio.coroutine
     def send_to_printer(self, data):
         """Simulate sending data to printer."""
         print("BEGUN printing {}".format(data[1]))
@@ -65,6 +66,7 @@ class PrintManager(object):
         # TODO: Update database
         print("FINISHED printing {}".format(data[1]))
 
+    @asyncio.coroutine
     def update_print_completion(self, data):
         """Update result of printing to some system."""
         print("BEGUN Sending update to backend via API {}".format(data[1]))
@@ -79,15 +81,15 @@ class PrintManager(object):
         update when done.
         """
         while not queue_for_printer.empty():
-            print_item = yield from queue_for_printer.get()
+            print_item = queue_for_printer.get_nowait()
             if hasattr(print_item, "type") and print_item.type is POISON_PILL:
                 break
             try:
                 yield from self.send_to_printer(print_item)
             except PrinterError as e:
                 print("Printer error {}".format(e))
-                self.stop_all_printers()
-                self.start(restart=True)
+                self.handle_printer_error(printer_id)
+                break
             else:
                 yield from self.update_print_completion(print_item)
 
@@ -140,7 +142,6 @@ class PrintManager(object):
             queue_printer_tuples.append((queues[i], printer_id))
             self.printer_queue_mapping[printer_id] = queues[i]
             i += 1
-        print("populate_queues :{}".format(queue_printer_tuples))
         return queue_printer_tuples
 
     def start(self, restart=False):
@@ -156,11 +157,11 @@ class PrintManager(object):
 
         loop = asyncio.get_event_loop()
 
-        # 4. Create a task to process the print for each printer
+        # 3. Create a task to process the print for each printer
         tasks = [self.print_items(queue_for_printer, printer_id)
                  for (queue_for_printer, printer_id) in queue_printer_tuples]
 
-        # # 5. Wait until all the tasks are completed
+        # 4. Wait until all the tasks are completed
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()
         return
@@ -177,6 +178,22 @@ class PrintManager(object):
         self.printer_queue_mapping[printer_id].put_nowait(
             PRIORITY_POISON_PILL, {"type": TYPE_POISON_PILL}
         )
+
+    def handle_printer_error(self, printer_id):
+        """Handle printer error by moving items to other printer's queue.
+
+        Also make an API call to let the caller know that printer has got
+        an issue.
+        """
+        # Move remaining items in the printer queue to other printers
+        printer_queue = self.printer_queue_mapping[printer_id]
+        random_printer = '2'
+        other_printer_queue = self.printer_queue_mapping[random_printer]
+        while not printer_queue.empty():
+            other_printer_queue.put_nowait(printer_queue.get_nowait())
+
+        # TODO:API call to backend to inform status
+        return None
 
 
 if __name__ == '__main__':
