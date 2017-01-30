@@ -48,6 +48,9 @@ class PrintItem(object):
     def __str__(self):
         return "PrintItem '{}'".format(self.name)
 
+    def __repr__(self):
+        return "PrintItem '{}'".format(self.name)
+
 
 class PrintManager(object):
     """Fetches data, assigns to printer and does some operations."""
@@ -57,16 +60,16 @@ class PrintManager(object):
 
     def send_to_printer(self, data):
         """Simulate sending data to printer."""
-        print("BEGUN printing '{}'".format(data))
+        print("BEGUN printing {}".format(data[1]))
         yield from asyncio.sleep(2)
         # TODO: Update database
-        print("FINISHED printing '{}'".format(data))
+        print("FINISHED printing {}".format(data[1]))
 
     def update_print_completion(self, data):
         """Update result of printing to some system."""
-        print("BEGUN Sending update to backend via API {}".format(data))
+        print("BEGUN Sending update to backend via API {}".format(data[1]))
         yield from asyncio.sleep(1)
-        print("FINISHED Sending update to backend via API {}".format(data))
+        print("FINISHED Sending update to backend via API {}".format(data[1]))
 
     @asyncio.coroutine
     def print_items(self, queue_for_printer, printer_id):
