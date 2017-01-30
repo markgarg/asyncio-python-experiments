@@ -1,10 +1,52 @@
 """Example for a print manager function."""
 import asyncio
-from asyncio import Queue
+from asyncio import PriorityQueue
 
 TYPE_POISON_PILL = "Poison Pill"
 PRIORITY_DEFAULT = 5
 PRIORITY_POISON_PILL = 1
+STATUS_NOT_STARTED = 'Not Started'
+
+
+class PrintItem(object):
+    """Representation of an item to be printed."""
+
+    def __init__(self, name, printer_id, status=STATUS_NOT_STARTED):
+        self.name = name
+        self.printer_id = printer_id
+        self.status = status
+
+    def __eq__(self, other):
+        """Dummy implementation."""
+        return isinstance(other, self.__class__)\
+            and self.name == other.name and self.status == other.status
+
+    def __hash__(self, other):
+        """Dummy implementation."""
+        hash((self.name, self.status))
+
+    def __lt__(self, other):
+        """Dummy implementation."""
+        return self.__eq__(other) < 0
+
+    def __gt__(self, other):
+        """Dummy implementation."""
+        return self.__eq__(other) > 0
+
+    def __le__(self, other):
+        """Dummy implementation."""
+        return self.__eq__(other) <= 0
+
+    def __ge__(self, other):
+        """Dummy implementation."""
+        return self.__eq__(other) >= 0
+
+    def __ne__(self, other):
+        """Dummy implementation."""
+        return self.__eq__(other) != 0
+
+    def __str__(self):
+        return "PrintItem '{}'".format(self.name)
 
 
 class PrintManager(object):
@@ -17,6 +59,7 @@ class PrintManager(object):
         """Simulate sending data to printer."""
         print("BEGUN printing '{}'".format(data))
         yield from asyncio.sleep(2)
+        # TODO: Update database
         print("FINISHED printing '{}'".format(data))
 
     def update_print_completion(self, data):
@@ -48,13 +91,13 @@ class PrintManager(object):
     def get_print_items(self):
         """Dummyd data with printer_id."""
         return [
-            {"name": "a", "status": STATUS_NOT_STARTED, "printer_id": 1},
-            {"name": "b", "status": STATUS_NOT_STARTED, "printer_id": 2},
-            {"name": "c", "status": STATUS_NOT_STARTED, "printer_id": 3},
-            {"name": "d", "status": STATUS_NOT_STARTED, "printer_id": 4},
-            {"name": "e", "status": STATUS_NOT_STARTED, "printer_id": 1},
-            {"name": "f", "status": STATUS_NOT_STARTED, "printer_id": 2},
-            {"name": "g", "status": STATUS_NOT_STARTED, "printer_id": 3},
+            PrintItem("a", 1, STATUS_NOT_STARTED),
+            PrintItem("b", 2, STATUS_NOT_STARTED),
+            PrintItem("c", 3, STATUS_NOT_STARTED),
+            PrintItem("d", 4, STATUS_NOT_STARTED),
+            PrintItem("e", 1, STATUS_NOT_STARTED),
+            PrintItem("f", 2, STATUS_NOT_STARTED),
+            PrintItem("g", 3, STATUS_NOT_STARTED),
         ]
 
     def get_active_printers(self):
@@ -65,19 +108,19 @@ class PrintManager(object):
         """Create a dict with each printer_id as key and data."""
         printer_data_list = {
             "1": [
-                {"name": "a", "printer_id": 1},
-                {"name": "e", "printer_id": 1},
+                PrintItem("a", 1, STATUS_NOT_STARTED),
+                PrintItem("e", 1, STATUS_NOT_STARTED),
             ],
             "2": [
-                {"name": "b", "printer_id": 2},
-                {"name": "f", "printer_id": 2},
+                PrintItem("b", 2, STATUS_NOT_STARTED),
+                PrintItem("f", 2, STATUS_NOT_STARTED),
             ],
             "3": [
-                {"name": "c", "printer_id": 3},
-                {"name": "g", "printer_id": 3},
+                PrintItem("c", 3, STATUS_NOT_STARTED),
+                PrintItem("g", 3, STATUS_NOT_STARTED),
             ],
             "4": [
-                {"name": "d", "printer_id": 4},
+                PrintItem("d", 4, STATUS_NOT_STARTED),
             ],
         }
         return printer_data_list
@@ -85,7 +128,7 @@ class PrintManager(object):
     def populate_queues(self, grouped_print_items):
         """Create a queue for each printer and populate items."""
         queue_printer_tuples = []
-        queues = [Queue() for _ in grouped_print_items]
+        queues = [PriorityQueue() for _ in grouped_print_items]
 
         i = 0
         for printer_id, print_item_list in grouped_print_items.items():
